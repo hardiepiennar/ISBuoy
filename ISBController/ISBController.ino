@@ -1,13 +1,13 @@
 /*
 Code for ISB Controller. The ISB Controller is a user interface 
-for the ISB project. This firmware controls an LCD and rotary 
-encoder to give the user control through menus. Data can then 
-be sent between the ISB system and the controller through a 
-tranceiver 
-
-Thanks to Adafruit for their LCD Library and Tutorials.
-Thanks to 0xPIT for his rotary encoder library
-*/
+ for the ISB project. This firmware controls an LCD and rotary 
+ encoder to give the user control through menus. Data can then 
+ be sent between the ISB system and the controller through a 
+ tranceiver 
+ 
+ Thanks to Adafruit for their LCD Library and Tutorials.
+ Thanks to 0xPIT for his rotary encoder library
+ */
 
 /*LCD Includes*/
 #include <SPI.h>
@@ -23,7 +23,7 @@ Thanks to 0xPIT for his rotary encoder library
 #include "configuration.h"
 
 /*GUI global variables*/
-/*LCD initialisation on hardware SPI (SPI cannot be used for any other peripherals)*/ 
+/*LCD initialisation on hardware SPI (SPI cannot be used for any other peripherals)*/
 Adafruit_PCD8544 display = Adafruit_PCD8544(LCD_DC, LCD_CS, LCD_RST);
 // Note with hardware SPI MISO and SS pins aren't used but will still be read
 // and written to during SPI transfer.  Be careful sharing these pins!
@@ -32,43 +32,48 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(LCD_DC, LCD_CS, LCD_RST);
 ClickEncoder *encoder = new ClickEncoder(ENCODER_DT, ENCODER_CLK, ENCODER_SWITCH,ENCODER_STEPS_PER_NOTCH);
 
 /*Keeps track of the current menu states*/
-short menuState;
-short innerMenuState;
-short noOfMenuItems;
+int menuState;
+int innerMenuState;
+int noOfMenuItems;
 
-/*Settings*/
+/*Settings variables*/
 int contrast = 57;
+
+/*Course variables*/
+int courseWidth = 11;
+int courseLength = 25;
+int courseTurns = 6;
 
 void setup()   {
   Serial.begin(9600);
-  
+
   /*Initialise rotary encoder used to control the interface
-  and screen used to display the interface*/
+   and screen used to display the interface*/
   initEncoder();
   initScreen(); 
-  
+
   /*Show intro*/
   splashScreen();
   delay(2000);
-  
+
   /*Initialise menu system*/
   menuState = MENU_STATUS; //Set the menu to status
   innerMenuState = -1;
   noOfMenuItems = 0;
-  
+
 }
 
 
 void loop() {
   /*Start with main routine*/
   //update all systems
-  
+
   /*Check controls and handle user input*/
   controlUpdate();
-  
+
   /*Update LCD*/
   screenUpdate();
-  
+
   delay(100);//Temporary for testing
 }
 
@@ -76,157 +81,318 @@ void loop() {
 void controlUpdate()
 {
   /*Handle the turning of the encoder by checking the direction
-  turned by the encoder*/  
+   turned by the encoder*/
   /*update encoder value*/
   int encoderValue = encoder->getValue();
-    
+
   /*Check if encoder state changed*/
   if (encoderValue != 0) 
   {
     /*Encoder button was pressed, handle event according to 
-    current menu status*/
+     current menu status*/
     switch(menuState)
     {
-      case MENU_STATUS:
-        
-        break;
-      
-      case MENU_MAIN:
-      case MENU_SETTINGS:
-        innerMenuState += encoderValue;
-        /*Keep cursor from selecting invalid option*/
-        if(innerMenuState < -1)
-          innerMenuState = MENU_BACK;
-        if(innerMenuState >= noOfMenuItems)
-          innerMenuState = noOfMenuItems - 1;
+    case MENU_STATUS:
+
+      break;
+
+    case MENU_MAIN:
+    case MENU_SETTINGS:
+    case MENU_COURSE:
+
+      innerMenuState += encoderValue;
+      /*Keep cursor from selecting invalid option*/
+      if(innerMenuState < -1)
+        innerMenuState = MENU_BACK;
+      if(innerMenuState >= noOfMenuItems)
+        innerMenuState = noOfMenuItems - 1;
+      break;
+
+      /*Change contrast value and set the new display contrast*/
+    case MENU_SETTINGS_CONTRAST:
+      contrast += encoderValue;
+
+      if(contrast > CONTRAST_MAX)
+        contrast = CONTRAST_MAX;
+      else if(contrast < CONTRAST_MIN)
+        contrast = CONTRAST_MIN;
+
+      display.setContrast(contrast);
+      break;
+
+      /*Change the width setting of the course*/
+    case MENU_COURSE_WIDTH:
+      courseWidth += encoderValue;
+
+      if(courseWidth > COURSE_MAX_WIDTH)
+        courseWidth = COURSE_MAX_WIDTH;
+      else if(courseWidth < COURSE_MIN_WIDTH)
+        courseWidth = COURSE_MIN_WIDTH;
+
+      break;
+      /*Change the length setting of the course*/
+    case MENU_COURSE_LENGTH:
+      courseLength += encoderValue;
+
+      if(courseLength > COURSE_MAX_LENGTH)
+        courseLength = COURSE_MAX_LENGTH;
+      else if(courseLength < COURSE_MIN_LENGTH)
+        courseLength = COURSE_MIN_LENGTH;
+
       break;
       
-      /*Change contrast value and set the new display contrast*/
-      case MENU_SETTINGS_CONTRAST:
-        contrast += encoderValue;
-        display.setContrast(contrast);
-        break;
+    case MENU_COURSE_TURNS:
+      courseTurns += encoderValue;
+
+      if(courseTurns > COURSE_MAX_TURNS)
+        courseTurns = COURSE_MAX_TURNS;
+      else if(courseTurns < COURSE_MIN_TURNS)
+        courseTurns = COURSE_MIN_TURNS;
+
+      break;
     } 
   }
-  
+
   /*Handle encoder button events. Various states can be checked,
-  however only the released state is really neccesary*/
+   however only the released state is really neccesary*/
   if(encoder->getButton() == ClickEncoder::Clicked)
   {
     /*Encoder button was pressed, handle event according to 
-    current menu status*/
+     current menu status*/
     switch(menuState)
     {
-      case MENU_STATUS:
-        /*Change into main menu*/
-        menuState = MENU_MAIN;
-        /*Reset menu specific variables*/
-        innerMenuState = MENU_BACK; 
+    case MENU_STATUS:
+      /*Change into main menu*/
+      menuState = MENU_MAIN;
+      /*Reset menu specific variables*/
+      innerMenuState = MENU_BACK; 
+      noOfMenuItems = 0;
+      break;
+
+    case MENU_MAIN:
+      /*Check which menu option is selected*/
+      switch(innerMenuState)
+      {
+      case MENU_BACK:
+        menuState = MENU_STATUS;
+        innerMenuState = MENU_BACK;
         noOfMenuItems = 0;
-        break;
-      
-      case MENU_MAIN:
-        /*Check which menu option is selected*/
-        switch(innerMenuState)
-        {
-           case MENU_BACK:
-             menuState = MENU_STATUS;
-             innerMenuState = MENU_BACK;
-             noOfMenuItems = 0;
-             break; 
-             
-           case MENU_SETTINGS_PLACEMENT:
-             menuState = MENU_SETTINGS;
-             innerMenuState = MENU_BACK;
-             noOfMenuItems = 0;
-             break; 
-        }
-      break;
-      
-      case MENU_SETTINGS:
-        /*Check which menu option is selected*/
-        switch(innerMenuState)
-        {
-           case MENU_BACK:
-             menuState = MENU_MAIN;
-             innerMenuState = MENU_BACK;
-             noOfMenuItems = 0;
-             break; 
-           
-           case MENU_CONTRAST_PLACEMENT:
-             menuState = MENU_SETTINGS_CONTRAST;
-             innerMenuState = MENU_BACK;
-             noOfMenuItems = 0;
-             break; 
-        }
-      break;
-      
-      case MENU_SETTINGS_CONTRAST:
+        break; 
+
+      case MENU_COURSE_PLACEMENT:
+        menuState = MENU_COURSE;
+        innerMenuState = MENU_BACK;
+        noOfMenuItems = 0;
+        break; 
+
+      case MENU_SETTINGS_PLACEMENT:
         menuState = MENU_SETTINGS;
+        innerMenuState = MENU_BACK;
+        noOfMenuItems = 0;
+        break; 
+      }
+      break;
+
+    case MENU_COURSE:
+      /*Check which menu option is selected*/
+      switch(innerMenuState)
+      {
+      case MENU_BACK:
+        menuState = MENU_MAIN;
+        innerMenuState = MENU_BACK;
+        noOfMenuItems = 0;
+        break; 
+
+      case MENU_COURSE_WIDTH_PLACEMENT:
+        menuState = MENU_COURSE_WIDTH;
+        innerMenuState = MENU_COURSE_WIDTH_PLACEMENT;
+        noOfMenuItems = 0;
+        break; 
+
+      case MENU_COURSE_LENGTH_PLACEMENT:
+        menuState = MENU_COURSE_LENGTH;
+        innerMenuState = MENU_COURSE_LENGTH_PLACEMENT;
+        noOfMenuItems = 0;
+        break; 
+        
+      case MENU_COURSE_TURNS_PLACEMENT:
+        menuState = MENU_COURSE_TURNS;
+        innerMenuState = MENU_COURSE_TURNS_PLACEMENT;
+        noOfMenuItems = 0;
+        break; 
+      }
+      break;
+
+    case MENU_COURSE_WIDTH:
+      menuState = MENU_COURSE;
+      innerMenuState = MENU_COURSE_WIDTH_PLACEMENT;
+      noOfMenuItems = 0;
+      break;
+
+    case MENU_COURSE_LENGTH:
+      menuState = MENU_COURSE;
+      innerMenuState = MENU_COURSE_LENGTH_PLACEMENT;
+      noOfMenuItems = 0;
+      break;
+      
+    case MENU_COURSE_TURNS:
+      menuState = MENU_COURSE;
+      innerMenuState = MENU_COURSE_TURNS_PLACEMENT;
+      noOfMenuItems = 0;
+      break;
+
+    case MENU_SETTINGS:
+      /*Check which menu option is selected*/
+      switch(innerMenuState)
+      {
+      case MENU_BACK:
+        menuState = MENU_MAIN;
+        innerMenuState = MENU_BACK;
+        noOfMenuItems = 0;
+        break; 
+
+      case MENU_CONTRAST_PLACEMENT:
+        menuState = MENU_SETTINGS_CONTRAST;
         innerMenuState = MENU_CONTRAST_PLACEMENT;
         noOfMenuItems = 0;
-        break;
-      
+        break; 
+      }
+      break;
+
+      /*Handle when slider is disabled*/
+    case MENU_SETTINGS_CONTRAST:
+      menuState = MENU_SETTINGS;
+      innerMenuState = MENU_CONTRAST_PLACEMENT;
+      noOfMenuItems = 0;
+      break;
+
     } 
   }
 }
 
 /*Draws the screen according to the current menu 
-and system status*/
+ and system status*/
 void screenUpdate()
 {
   /*Clear Screen*/
   display.clearDisplay();
-  
+
   switch(menuState)
   {
-    case MENU_STATUS:
-      /*Draw header*/
-      drawHeader("STATUS");
-      break;
-    
-    case MENU_MAIN:
-      /*Draw header*/
-      drawHeader("MENU");
-      /*Draw menu items*/
-      noOfMenuItems = 0;
-      drawMenuItem("SESSION",MENU_SESSION_PLACEMENT);
-      drawMenuItem("COURSE",MENU_COURSE_PLACEMENT);
-      drawMenuItem("BUOYS",MENU_BOUYS_PLACEMENT);      
-      drawMenuItem("SETTINGS",MENU_SETTINGS_PLACEMENT);
-      /*Draw selected cursor*/
-      drawCursor();
+  case MENU_STATUS:
+    /*Draw header*/
+    drawHeader("STATUS");
     break;
 
-    case MENU_SETTINGS:
-    case MENU_SETTINGS_CONTRAST:
-      /*Draw header*/
-      drawHeader("SETTINGS");
-      /*Draw menu items*/
-      noOfMenuItems = 0;
-      if(menuState == MENU_SETTINGS_CONTRAST)
-        drawMenuSliderItem("CONTRAST",MENU_CONTRAST_PLACEMENT,contrast,0,100,1);
-      else
-        drawMenuSliderItem("CONTRAST",MENU_CONTRAST_PLACEMENT,contrast,0,100,0);
-      /*Draw selected cursor*/
-      drawCursor();
-      break;
-      
-     
+  case MENU_MAIN:
+    /*Draw header*/
+    drawHeader("MENU");
+    /*Draw menu items*/
+    noOfMenuItems = 0;
+    drawMenuItem("START SESSION",MENU_SESSION_PLACEMENT);
+    drawMenuItem("COURSE",MENU_COURSE_PLACEMENT);
+    drawMenuItem("BUOYS",MENU_BOUYS_PLACEMENT);      
+    drawMenuItem("SETTINGS",MENU_SETTINGS_PLACEMENT);
+    /*Draw selected cursor*/
+    drawCursor();
+    break;
+
+  case MENU_COURSE:
+    /*Draw header*/
+    drawHeader("COURSE");
+
+    /*Draw menu items*/
+    noOfMenuItems = 0;
+    drawMenuSliderItem("WIDTH",MENU_COURSE_WIDTH_PLACEMENT,courseWidth,COURSE_MIN_WIDTH,COURSE_MAX_WIDTH,0);
+    drawMenuSliderItem("LENGTH",MENU_COURSE_LENGTH_PLACEMENT,courseLength,COURSE_MIN_LENGTH,COURSE_MAX_LENGTH,0);
+    drawMenuSliderItem("TURNS",MENU_COURSE_TURNS_PLACEMENT,courseTurns,COURSE_MIN_TURNS,COURSE_MAX_TURNS,0);
+    /*Draw selected cursor*/
+    drawCursor();
+
+
+    break;  
+  case MENU_COURSE_WIDTH:
+  case MENU_COURSE_LENGTH:
+  case MENU_COURSE_TURNS:
+    /*Draw header*/
+    drawHeader("COURSE");
+    /*Draw menu items*/
+    noOfMenuItems = 0;
+
+    /*Draw menu item*/
+    if(menuState == MENU_COURSE_WIDTH)
+      drawMenuSliderItem("WIDTH",0,courseWidth,COURSE_MIN_WIDTH,COURSE_MAX_WIDTH,1);
+    else if(menuState == MENU_COURSE_LENGTH)
+      drawMenuSliderItem("LENGTH",0,courseLength,COURSE_MIN_LENGTH,COURSE_MAX_LENGTH,1);
+    else if(menuState == MENU_COURSE_TURNS)
+      drawMenuSliderItem("TURNS",0,courseTurns,COURSE_MIN_TURNS,COURSE_MAX_TURNS,1);
+    /*Draw Course*/
+    drawCourse();
+    break;
+
+  case MENU_SETTINGS:
+  case MENU_SETTINGS_CONTRAST:
+    /*Draw header*/
+    drawHeader("SETTINGS");
+    /*Draw menu items*/
+    noOfMenuItems = 0;
+    if(menuState == MENU_SETTINGS_CONTRAST)
+      drawMenuSliderItem("CONTRAST",MENU_CONTRAST_PLACEMENT,contrast,0,100,1);
+    else
+      drawMenuSliderItem("CONTRAST",MENU_CONTRAST_PLACEMENT,contrast,0,100,0);
+    /*Draw selected cursor*/
+    drawCursor();
+    break;
+
+
   } 
-  
+
   /*Redraw Screen*/
   display.display();
 }
 
+/*Draws the ski course in pixels on the screen with a given position*/
+void drawCourse()
+{
+  
+  int turns = courseTurns;
+  int centreLine = display.height() - COURSE_DISPLAY_SIZE/2 -1;
+  int middleCourse = 42;
+  int turnSpacing = ((courseLength-COURSE_MIN_LENGTH)*((display.width()-2 - 2*(turns+2))/(turns+2)))/(COURSE_MAX_LENGTH - COURSE_MIN_LENGTH)+3;
+  int outsideBuoy = ((courseWidth-COURSE_MIN_WIDTH)*(COURSE_DISPLAY_SIZE/2-1-5))/(COURSE_MAX_WIDTH - COURSE_MIN_WIDTH);
+  int startX = middleCourse-(turnSpacing*(turns+2))/2+turnSpacing/2;
+
+  //Draw frame with line at top and line at bottom
+  display.drawLine(0,display.height() - COURSE_DISPLAY_SIZE,display.width(),display.height() - COURSE_DISPLAY_SIZE,BLACK);
+  display.drawLine(0,display.height()-1,display.width(),display.height()-1,BLACK);
+
+  //Draw Gates
+  int i = 0;
+  for (i = 0;i<turns +2;i++)
+  {
+    display.drawPixel(startX + turnSpacing*i,centreLine-1,BLACK);
+    display.drawPixel(startX+ turnSpacing*i,centreLine+1,BLACK);
+  }
+
+  //Draw Turn Buoys
+  for (i = 1;i<turns +1;i++)
+  {
+    if(i%2 == 0)
+      display.drawPixel(startX + turnSpacing*i,centreLine-outsideBuoy-4,BLACK);
+    else
+      display.drawPixel(startX + turnSpacing*i,centreLine+outsideBuoy+4,BLACK);
+  }
+
+}
+
 /*Draws cursor at selected menu item using the globally defined
-selected item variable*/
+ selected item variable*/
 void drawCursor()
 {
   display.setTextColor(BLACK);
-  
+
   /*if innerMenuState is -1, the cursor is drawn over the back
-  menu item*/  
+   menu item*/
   int index = innerMenuState;
   if(index == -1)
   {      
@@ -234,87 +400,98 @@ void drawCursor()
   }
   else
   {
-     display.fillRect(0,index*(LINE_HEIGHT +LINE_SPACER) + HEADER_HEIGHT+LINE_SPACER,CURSOR_WIDTH,LINE_HEIGHT,BLACK);
+    display.fillRect(0,index*(LINE_HEIGHT +LINE_SPACER) + HEADER_HEIGHT+LINE_SPACER,CURSOR_WIDTH,LINE_HEIGHT,BLACK);
   }
 }
 
 /*Draws a menu item with a slider function, the menu item displays the current value when inactive.
-When active, the string is replaced by the slider which is then drawn as specified with min max and
-its current value*/
+ When active, the string is replaced by the slider which is then drawn as specified with min max and
+ its current value*/
 void drawMenuSliderItem(char* string,short index,int value,int minValue,int maxValue,short active)
 {
-    int barLength = 60;
-    char buffer[3];
-    display.setTextColor(BLACK);
-    display.setTextSize(1);
-    
-    if(active == 0)
-    {
-      //Draw name of slider
-      display.setCursor(CURSOR_WIDTH+1,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER);
-      display.println(string);           
-    }
-    else
-    {
-      display.drawRect(0,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER,barLength,LINE_HEIGHT,BLACK);
-      display.fillRect(0,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER,(int)((barLength*value/(maxValue-minValue))),LINE_HEIGHT,BLACK);
-    }
-    
-    //Draw slider value
-    display.setCursor(display.width() - 20,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER);
-    display.println(itoa(value,buffer,10));
-    
-    /*Increase the number of menu items available*/
-    noOfMenuItems += 1;
+
+  char buffer[3];
+  display.setTextColor(BLACK);
+  display.setTextSize(1);
+
+  if(active == 0)
+  {
+    //Draw name of slider
+    display.setCursor(CURSOR_WIDTH+1,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER);
+    display.println(string);           
+  }
+  else
+  {
+    display.drawRect(CURSOR_WIDTH+1,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER,SLIDER_BAR_LENGTH,LINE_HEIGHT,BLACK);
+    display.fillRect(CURSOR_WIDTH+1,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER,(int)(((SLIDER_BAR_LENGTH*(value-minValue))/(maxValue-minValue))),LINE_HEIGHT,BLACK);
+  }
+
+  //Draw slider value
+  display.setCursor(display.width() - 20,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER);
+  display.println(itoa(value,buffer,10));
+
+  /*Increase the number of menu items available*/
+  noOfMenuItems += 1;
 }
 /*Draws a menu item under the header location with a 
-given index. This allows menu items to be easily swapped
-in the configuration. Menu items should have names 10 
-characters or less, its assumed that the 0 state is the
-root state, therefore it will not have any back
-button*/
+ given index. This allows menu items to be easily swapped
+ in the configuration. Menu items should have names 10 
+ characters or less, its assumed that the 0 state is the
+ root state, therefore it will not have any back
+ button*/
 void drawMenuItem(char* string,short index)
 {
-    display.setTextColor(BLACK);
-    display.setTextSize(1);
-    display.setCursor(CURSOR_WIDTH+1,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER);
-    display.println(string);
-    
-    /*Increase the number of menu items available*/
-    noOfMenuItems += 1;
+  display.setTextColor(BLACK);
+  display.setTextSize(1);
+  display.setCursor(CURSOR_WIDTH+1,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER);
+  display.println(string);
+
+  /*Increase the number of menu items available*/
+  noOfMenuItems += 1;
 }
 
 /*Create a header at the top of the screen*/
 void drawHeader(char* string)
 {
-    display.setTextColor(BLACK);
-    display.setTextSize(1);
-    display.setCursor(0,0);
-    display.println(string);
-    display.drawLine(0,(HEADER_HEIGHT- LINE_SPACER),display.width(),(HEADER_HEIGHT)- LINE_SPACER,BLACK);
-    display.drawLine(0,(HEADER_HEIGHT- LINE_SPACER)-1,display.width(),(HEADER_HEIGHT)- LINE_SPACER-1,BLACK);
-    
-    if(menuState != MENU_STATUS)
-    {
-      display.setCursor(BACK_BUTTON_START + BACK_BUTTON_CURSOR_WIDTH + 1,0);
-      display.println("Back");
-    }
+  display.setTextColor(BLACK);
+  display.setTextSize(1);
+  display.setCursor(0,0);
+  display.println(string);
+
+  int lengthOfString = strlen(string);
+  int endOfLine = display.width(); 
+
+  if(menuState != MENU_STATUS)
+  {
+    display.setCursor(BACK_BUTTON_START + BACK_BUTTON_CURSOR_WIDTH + 1,0);
+    display.println("Back");
+
+    if (innerMenuState == MENU_BACK)
+      endOfLine  = BACK_BUTTON_START -1 - 1;
+    else
+      endOfLine  = BACK_BUTTON_START -1 + BACK_BUTTON_CURSOR_WIDTH;
+  }
+
+  display.drawLine(lengthOfString*CHAR_WIDTH,(HEADER_HEIGHT- LINE_SPACER),endOfLine,(HEADER_HEIGHT)- LINE_SPACER,BLACK);
+  display.drawLine(lengthOfString*CHAR_WIDTH,(HEADER_HEIGHT- LINE_SPACER)-1,endOfLine,(HEADER_HEIGHT)- LINE_SPACER-1,BLACK);
+
+
 }
 
 /*Shows the Intelligent Ski-Course splash screen*/
 void splashScreen()
 {
-    display.clearDisplay();   
-    display.setTextColor(BLACK);
-    display.setTextSize(1);
-    display.setCursor(3,2);
-    display.println(" INTELLIGENT");
-    display.setTextSize(2);
-    display.setCursor(0,14);
-    display.println("  SKI");
-    display.setCursor(6,32);
-    display.println("COURSE");  
-    display.display();    
+  display.clearDisplay();   
+  display.setTextColor(BLACK);
+  display.setTextSize(1);
+  display.setCursor(3,2);
+  display.println(" INTELLIGENT");
+  display.setTextSize(2);
+  display.setCursor(0,14);
+  display.println("  SKI");
+  display.setCursor(6,32);
+  display.println("COURSE");  
+  display.display();    
 }
 
 /*Initialise encoder by setting up interrupts*/
@@ -330,7 +507,7 @@ void initScreen()
 {  
   /*Initialise screen*/
   display.begin();
-  
+
   /*Set the contrast of the display*/
   display.setContrast(contrast);
 }
@@ -339,3 +516,4 @@ void initScreen()
 void timerIsr() {
   encoder->service();
 }
+
