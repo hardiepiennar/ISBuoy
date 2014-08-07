@@ -35,6 +35,7 @@ ClickEncoder *encoder = new ClickEncoder(ENCODER_DT, ENCODER_CLK, ENCODER_SWITCH
 int menuState;
 int innerMenuState;
 int noOfMenuItems;
+short screenChanged;
 
 /*Settings variables*/
 int contrast = 57;
@@ -60,7 +61,7 @@ void setup()   {
   menuState = MENU_STATUS; //Set the menu to status
   innerMenuState = -1;
   noOfMenuItems = 0;
-
+  screenChanged = 1;
 }
 
 
@@ -72,7 +73,11 @@ void loop() {
   controlUpdate();
 
   /*Update LCD*/
-  screenUpdate();
+  if(screenChanged)
+  {
+    screenUpdate();
+    screenChanged = 0;
+  }
 
   delay(100);//Temporary for testing
 }
@@ -88,68 +93,73 @@ void controlUpdate()
   /*Check if encoder state changed*/
   if (encoderValue != 0) 
   {
+    /*A screen update is neccesary*/
+    screenChanged = 1;
+    
     /*Encoder button was pressed, handle event according to 
      current menu status*/
     switch(menuState)
     {
-    case MENU_STATUS:
-
-      break;
-
-    case MENU_MAIN:
-    case MENU_SETTINGS:
-    case MENU_COURSE:
-
-      innerMenuState += encoderValue;
-      /*Keep cursor from selecting invalid option*/
-      if(innerMenuState < -1)
-        innerMenuState = MENU_BACK;
-      if(innerMenuState >= noOfMenuItems)
-        innerMenuState = noOfMenuItems - 1;
-      break;
-
+      case MENU_STATUS:
+  
+        break;
+  
+      case MENU_MAIN:
+      case MENU_SETTINGS:
+      case MENU_COURSE:
+      case MENU_SESSION:
+      case MENU_BUOYS:
+        innerMenuState += encoderValue;
+        /*Keep cursor from selecting invalid option*/
+        if(innerMenuState < -1)
+          innerMenuState = MENU_BACK;
+        if(innerMenuState >= noOfMenuItems)
+          innerMenuState = noOfMenuItems - 1;
+        break;
+  
       /*Change contrast value and set the new display contrast*/
-    case MENU_SETTINGS_CONTRAST:
-      contrast += encoderValue;
-
-      if(contrast > CONTRAST_MAX)
-        contrast = CONTRAST_MAX;
-      else if(contrast < CONTRAST_MIN)
-        contrast = CONTRAST_MIN;
-
-      display.setContrast(contrast);
-      break;
-
+      case MENU_SETTINGS_CONTRAST:
+        contrast += encoderValue;
+  
+        if(contrast > CONTRAST_MAX)
+          contrast = CONTRAST_MAX;
+        else if(contrast < CONTRAST_MIN)
+          contrast = CONTRAST_MIN;
+  
+        display.setContrast(contrast);
+        break;
+  
       /*Change the width setting of the course*/
-    case MENU_COURSE_WIDTH:
-      courseWidth += encoderValue;
-
-      if(courseWidth > COURSE_MAX_WIDTH)
-        courseWidth = COURSE_MAX_WIDTH;
-      else if(courseWidth < COURSE_MIN_WIDTH)
-        courseWidth = COURSE_MIN_WIDTH;
-
-      break;
+      case MENU_COURSE_WIDTH:
+        courseWidth += encoderValue;
+  
+        if(courseWidth > COURSE_MAX_WIDTH)
+          courseWidth = COURSE_MAX_WIDTH;
+        else if(courseWidth < COURSE_MIN_WIDTH)
+          courseWidth = COURSE_MIN_WIDTH;
+  
+        break;
       /*Change the length setting of the course*/
-    case MENU_COURSE_LENGTH:
-      courseLength += encoderValue;
-
-      if(courseLength > COURSE_MAX_LENGTH)
-        courseLength = COURSE_MAX_LENGTH;
-      else if(courseLength < COURSE_MIN_LENGTH)
-        courseLength = COURSE_MIN_LENGTH;
-
-      break;
-      
-    case MENU_COURSE_TURNS:
-      courseTurns += encoderValue;
-
-      if(courseTurns > COURSE_MAX_TURNS)
-        courseTurns = COURSE_MAX_TURNS;
-      else if(courseTurns < COURSE_MIN_TURNS)
-        courseTurns = COURSE_MIN_TURNS;
-
-      break;
+      case MENU_COURSE_LENGTH:
+        courseLength += encoderValue;
+  
+        if(courseLength > COURSE_MAX_LENGTH)
+          courseLength = COURSE_MAX_LENGTH;
+        else if(courseLength < COURSE_MIN_LENGTH)
+          courseLength = COURSE_MIN_LENGTH;
+  
+        break;
+        
+      /*Change the turn setting of the course*/  
+      case MENU_COURSE_TURNS:
+        courseTurns += encoderValue;
+  
+        if(courseTurns > COURSE_MAX_TURNS)
+          courseTurns = COURSE_MAX_TURNS;
+        else if(courseTurns < COURSE_MIN_TURNS)
+          courseTurns = COURSE_MIN_TURNS;
+  
+        break;
     } 
   }
 
@@ -157,6 +167,9 @@ void controlUpdate()
    however only the released state is really neccesary*/
   if(encoder->getButton() == ClickEncoder::Clicked)
   {
+    /*A screen update is neccesary*/
+    screenChanged = 1;
+        
     /*Encoder button was pressed, handle event according to 
      current menu status*/
     switch(menuState)
@@ -173,98 +186,134 @@ void controlUpdate()
       /*Check which menu option is selected*/
       switch(innerMenuState)
       {
-      case MENU_BACK:
-        menuState = MENU_STATUS;
-        innerMenuState = MENU_BACK;
-        noOfMenuItems = 0;
-        break; 
-
-      case MENU_COURSE_PLACEMENT:
-        menuState = MENU_COURSE;
-        innerMenuState = MENU_BACK;
-        noOfMenuItems = 0;
-        break; 
-
-      case MENU_SETTINGS_PLACEMENT:
-        menuState = MENU_SETTINGS;
-        innerMenuState = MENU_BACK;
-        noOfMenuItems = 0;
-        break; 
+        case MENU_BACK:
+          menuState = MENU_STATUS;
+          innerMenuState = MENU_BACK;
+          noOfMenuItems = 0;
+          break; 
+  
+        case MENU_SESSION_PLACEMENT:
+          menuState = MENU_SESSION;
+          innerMenuState = MENU_BACK;
+          noOfMenuItems = 0;
+          break; 
+  
+        case MENU_COURSE_PLACEMENT:
+          menuState = MENU_COURSE;
+          innerMenuState = MENU_BACK;
+          noOfMenuItems = 0;
+          break; 
+          
+        case MENU_BUOYS_PLACEMENT:
+          menuState = MENU_BUOYS;
+          innerMenuState = MENU_BACK;
+          noOfMenuItems = 0;
+          break; 
+  
+        case MENU_SETTINGS_PLACEMENT:
+          menuState = MENU_SETTINGS;
+          innerMenuState = MENU_BACK;
+          noOfMenuItems = 0;
+          break; 
       }
       break;
-
+  
+    case MENU_SESSION:
+    {
+      switch(innerMenuState)
+      {
+        case MENU_BACK:
+          menuState = MENU_MAIN;
+          innerMenuState = MENU_BACK;
+          noOfMenuItems = 0;
+          break; 
+      }
+    }
+    
     case MENU_COURSE:
       /*Check which menu option is selected*/
       switch(innerMenuState)
       {
-      case MENU_BACK:
-        menuState = MENU_MAIN;
-        innerMenuState = MENU_BACK;
-        noOfMenuItems = 0;
-        break; 
-
-      case MENU_COURSE_WIDTH_PLACEMENT:
-        menuState = MENU_COURSE_WIDTH;
+        case MENU_BACK:
+          menuState = MENU_MAIN;
+          innerMenuState = MENU_BACK;
+          noOfMenuItems = 0;
+          break; 
+  
+        case MENU_COURSE_WIDTH_PLACEMENT:
+          menuState = MENU_COURSE_WIDTH;
+          innerMenuState = MENU_COURSE_WIDTH_PLACEMENT;
+          noOfMenuItems = 0;
+          break; 
+  
+        case MENU_COURSE_LENGTH_PLACEMENT:
+          menuState = MENU_COURSE_LENGTH;
+          innerMenuState = MENU_COURSE_LENGTH_PLACEMENT;
+          noOfMenuItems = 0;
+          break; 
+          
+        case MENU_COURSE_TURNS_PLACEMENT:
+          menuState = MENU_COURSE_TURNS;
+          innerMenuState = MENU_COURSE_TURNS_PLACEMENT;
+          noOfMenuItems = 0;
+          break; 
+        }
+        break;
+  
+      case MENU_COURSE_WIDTH:
+        menuState = MENU_COURSE;
         innerMenuState = MENU_COURSE_WIDTH_PLACEMENT;
         noOfMenuItems = 0;
-        break; 
-
-      case MENU_COURSE_LENGTH_PLACEMENT:
-        menuState = MENU_COURSE_LENGTH;
+        break;
+  
+      case MENU_COURSE_LENGTH:
+        menuState = MENU_COURSE;
         innerMenuState = MENU_COURSE_LENGTH_PLACEMENT;
         noOfMenuItems = 0;
-        break; 
+        break;
         
-      case MENU_COURSE_TURNS_PLACEMENT:
-        menuState = MENU_COURSE_TURNS;
+      case MENU_COURSE_TURNS:
+        menuState = MENU_COURSE;
         innerMenuState = MENU_COURSE_TURNS_PLACEMENT;
         noOfMenuItems = 0;
-        break; 
-      }
-      break;
-
-    case MENU_COURSE_WIDTH:
-      menuState = MENU_COURSE;
-      innerMenuState = MENU_COURSE_WIDTH_PLACEMENT;
-      noOfMenuItems = 0;
-      break;
-
-    case MENU_COURSE_LENGTH:
-      menuState = MENU_COURSE;
-      innerMenuState = MENU_COURSE_LENGTH_PLACEMENT;
-      noOfMenuItems = 0;
-      break;
+        break;
       
-    case MENU_COURSE_TURNS:
-      menuState = MENU_COURSE;
-      innerMenuState = MENU_COURSE_TURNS_PLACEMENT;
-      noOfMenuItems = 0;
-      break;
-
-    case MENU_SETTINGS:
-      /*Check which menu option is selected*/
-      switch(innerMenuState)
+      case MENU_BUOYS:
       {
-      case MENU_BACK:
-        menuState = MENU_MAIN;
-        innerMenuState = MENU_BACK;
-        noOfMenuItems = 0;
-        break; 
-
-      case MENU_CONTRAST_PLACEMENT:
-        menuState = MENU_SETTINGS_CONTRAST;
+        switch(innerMenuState)
+        {
+          case MENU_BACK:
+            menuState = MENU_MAIN;
+            innerMenuState = MENU_BACK;
+            noOfMenuItems = 0;
+            break; 
+        }
+      }
+      
+      case MENU_SETTINGS:
+        /*Check which menu option is selected*/
+        switch(innerMenuState)
+        {
+          case MENU_BACK:
+            menuState = MENU_MAIN;
+            innerMenuState = MENU_BACK;
+            noOfMenuItems = 0;
+            break; 
+    
+          case MENU_CONTRAST_PLACEMENT:
+            menuState = MENU_SETTINGS_CONTRAST;
+            innerMenuState = MENU_CONTRAST_PLACEMENT;
+            noOfMenuItems = 0;
+            break; 
+        }
+        break;
+  
+      /*Handle when slider is disabled*/
+      case MENU_SETTINGS_CONTRAST:
+        menuState = MENU_SETTINGS;
         innerMenuState = MENU_CONTRAST_PLACEMENT;
         noOfMenuItems = 0;
-        break; 
-      }
-      break;
-
-      /*Handle when slider is disabled*/
-    case MENU_SETTINGS_CONTRAST:
-      menuState = MENU_SETTINGS;
-      innerMenuState = MENU_CONTRAST_PLACEMENT;
-      noOfMenuItems = 0;
-      break;
+        break;
 
     } 
   }
@@ -282,6 +331,10 @@ void screenUpdate()
   case MENU_STATUS:
     /*Draw header*/
     drawHeader("STATUS");
+    
+    /*Show Course*/
+    drawCourse();
+    
     break;
 
   case MENU_MAIN:
@@ -291,8 +344,22 @@ void screenUpdate()
     noOfMenuItems = 0;
     drawMenuItem("START SESSION",MENU_SESSION_PLACEMENT);
     drawMenuItem("COURSE",MENU_COURSE_PLACEMENT);
-    drawMenuItem("BUOYS",MENU_BOUYS_PLACEMENT);      
+    drawMenuItem("BUOYS",MENU_BUOYS_PLACEMENT);      
     drawMenuItem("SETTINGS",MENU_SETTINGS_PLACEMENT);
+    /*Draw selected cursor*/
+    drawCursor();
+    break;
+
+  case MENU_SESSION:
+    /*Draw header*/
+    drawHeader("SESSION");
+    
+    /*TODO Still to be determined*/
+    display.setTextColor(BLACK);
+    display.setTextSize(1);
+    display.setCursor(1,18);
+    display.println("Under\nConstruction");
+    
     /*Draw selected cursor*/
     drawCursor();
     break;
@@ -303,14 +370,13 @@ void screenUpdate()
 
     /*Draw menu items*/
     noOfMenuItems = 0;
-    drawMenuSliderItem("WIDTH",MENU_COURSE_WIDTH_PLACEMENT,courseWidth,COURSE_MIN_WIDTH,COURSE_MAX_WIDTH,0);
-    drawMenuSliderItem("LENGTH",MENU_COURSE_LENGTH_PLACEMENT,courseLength,COURSE_MIN_LENGTH,COURSE_MAX_LENGTH,0);
-    drawMenuSliderItem("TURNS",MENU_COURSE_TURNS_PLACEMENT,courseTurns,COURSE_MIN_TURNS,COURSE_MAX_TURNS,0);
+    drawMenuSliderItem("WIDTH","m",MENU_COURSE_WIDTH_PLACEMENT,courseWidth,COURSE_MIN_WIDTH,COURSE_MAX_WIDTH,0);
+    drawMenuSliderItem("LENGTH","m",MENU_COURSE_LENGTH_PLACEMENT,courseLength,COURSE_MIN_LENGTH,COURSE_MAX_LENGTH,0);
+    drawMenuSliderItem("TURNS","m",MENU_COURSE_TURNS_PLACEMENT,courseTurns,COURSE_MIN_TURNS,COURSE_MAX_TURNS,0);
     /*Draw selected cursor*/
     drawCursor();
-
-
     break;  
+  
   case MENU_COURSE_WIDTH:
   case MENU_COURSE_LENGTH:
   case MENU_COURSE_TURNS:
@@ -321,15 +387,30 @@ void screenUpdate()
 
     /*Draw menu item*/
     if(menuState == MENU_COURSE_WIDTH)
-      drawMenuSliderItem("WIDTH",0,courseWidth,COURSE_MIN_WIDTH,COURSE_MAX_WIDTH,1);
+      drawMenuSliderItem("WIDTH","m",0,courseWidth,COURSE_MIN_WIDTH,COURSE_MAX_WIDTH,1);
     else if(menuState == MENU_COURSE_LENGTH)
-      drawMenuSliderItem("LENGTH",0,courseLength,COURSE_MIN_LENGTH,COURSE_MAX_LENGTH,1);
+      drawMenuSliderItem("LENGTH","m",0,courseLength,COURSE_MIN_LENGTH,COURSE_MAX_LENGTH,1);
     else if(menuState == MENU_COURSE_TURNS)
-      drawMenuSliderItem("TURNS",0,courseTurns,COURSE_MIN_TURNS,COURSE_MAX_TURNS,1);
+      drawMenuSliderItem("TURNS","m",0,courseTurns,COURSE_MIN_TURNS,COURSE_MAX_TURNS,1);
     /*Draw Course*/
     drawCourse();
     break;
 
+  case MENU_BUOYS:
+    /*Draw header*/
+    drawHeader("BUOYS");
+    
+    
+    /*TODO: Show all the available buoys on the network*/
+    display.setTextColor(BLACK);
+    display.setTextSize(1);
+    display.setCursor(1,18);
+    display.println("Under\nConstruction");
+    
+    /*Draw selected cursor*/
+    drawCursor();
+    break;
+  
   case MENU_SETTINGS:
   case MENU_SETTINGS_CONTRAST:
     /*Draw header*/
@@ -337,9 +418,9 @@ void screenUpdate()
     /*Draw menu items*/
     noOfMenuItems = 0;
     if(menuState == MENU_SETTINGS_CONTRAST)
-      drawMenuSliderItem("CONTRAST",MENU_CONTRAST_PLACEMENT,contrast,0,100,1);
+      drawMenuSliderItem("CONTRAST","%",MENU_CONTRAST_PLACEMENT,contrast,0,100,1);
     else
-      drawMenuSliderItem("CONTRAST",MENU_CONTRAST_PLACEMENT,contrast,0,100,0);
+      drawMenuSliderItem("CONTRAST","%",MENU_CONTRAST_PLACEMENT,contrast,0,100,0);
     /*Draw selected cursor*/
     drawCursor();
     break;
@@ -378,9 +459,9 @@ void drawCourse()
   for (i = 1;i<turns +1;i++)
   {
     if(i%2 == 0)
-      display.drawPixel(startX + turnSpacing*i,centreLine-outsideBuoy-4,BLACK);
+      display.fillCircle(startX + turnSpacing*i,centreLine-outsideBuoy-4,1,BLACK);
     else
-      display.drawPixel(startX + turnSpacing*i,centreLine+outsideBuoy+4,BLACK);
+      display.fillCircle(startX + turnSpacing*i,centreLine+outsideBuoy+4,1,BLACK);
   }
 
 }
@@ -407,7 +488,7 @@ void drawCursor()
 /*Draws a menu item with a slider function, the menu item displays the current value when inactive.
  When active, the string is replaced by the slider which is then drawn as specified with min max and
  its current value*/
-void drawMenuSliderItem(char* string,short index,int value,int minValue,int maxValue,short active)
+void drawMenuSliderItem(char* string,char* unit,short index,int value,int minValue,int maxValue,short active)
 {
 
   char buffer[3];
@@ -425,10 +506,20 @@ void drawMenuSliderItem(char* string,short index,int value,int minValue,int maxV
     display.drawRect(CURSOR_WIDTH+1,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER,SLIDER_BAR_LENGTH,LINE_HEIGHT,BLACK);
     display.fillRect(CURSOR_WIDTH+1,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER,(int)(((SLIDER_BAR_LENGTH*(value-minValue))/(maxValue-minValue))),LINE_HEIGHT,BLACK);
   }
-
+  
+  /*Make sure value is positioned against unit*/
+  int offset = 0;
+  if(value < 10)
+    offset = CHAR_WIDTH;
+    
+  itoa(value,buffer,10);
+  
   //Draw slider value
-  display.setCursor(display.width() - 20,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER);
-  display.println(itoa(value,buffer,10));
+  display.setCursor(display.width() - 20+offset,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER);
+  display.println(buffer);
+  
+  display.setCursor(display.width() - CHAR_WIDTH,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER);
+  display.println(unit);
 
   /*Increase the number of menu items available*/
   noOfMenuItems += 1;
@@ -514,6 +605,7 @@ void initScreen()
 
 /*Interrupt on encoder events*/
 void timerIsr() {
+  
   encoder->service();
 }
 

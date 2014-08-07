@@ -19,7 +19,7 @@
 //Main menu state
 #define MENU_SESSION 2
 #define MENU_COURSE 3
-#define MENU_BOUYS 4
+#define MENU_BUOYS 4
 #define MENU_SETTINGS 5
 /*Settings state*/
 #define MENU_SETTINGS_CONTRAST 6
@@ -33,7 +33,7 @@
 /*Main Menu*/
 #define MENU_SESSION_PLACEMENT 0
 #define MENU_COURSE_PLACEMENT 1
-#define MENU_BOUYS_PLACEMENT 2
+#define MENU_BUOYS_PLACEMENT 2
 #define MENU_SETTINGS_PLACEMENT 3
 /*Course*/
 #define MENU_COURSE_WIDTH_PLACEMENT 0
