@@ -46,6 +46,7 @@
 /*Define encoder settings*/
 #define ENCODER_STEPS_PER_NOTCH 4
 
+void updateGUI();
 void controlUpdate();
 void screenUpdate();
 void drawMenuSliderItem(char* string,char* unit,short index,int value,int minValue,int maxValue,short active);

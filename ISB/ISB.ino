@@ -7,6 +7,7 @@
 /*Tranceiver includes*/
 #include <SPI.h>
 #include <nRF24L01.h>
+#include <RF24Network.h>
 #include <RF24.h>
 
 #include <Wire.h> //I2C Arduino Library
@@ -20,13 +21,31 @@ char buffer[BUFFSIZ];
 
 SoftwareSerial mySerial =  SoftwareSerial(GPS_TX, GPS_RX);
 
-/*RF module variables*/
-const uint64_t controlRXPipe = 0xE8E8F0F0E1LL; // Define the transmit pipe
-const uint64_t controlTXPipe = 0xAAAAF0A0BBLL; // Define the transmit pipe
-RF24 radio(RF_CE, RF_CSN);
-
 #define address 0x1E //0011110b, I2C 7bit address of HMC5883
 
+/*RF module variables*/
+RF24 radio(RF_CE, RF_CSN);
+//Network uses that radio
+RF24Network network(radio);
+
+/*Define radio addresses*/
+#define CONTROLLER_ADDRESS 0
+#define BUOY_G1_ADDRESS 1
+
+/*Define message types*/
+#define REQUEST_HEARTBEAT 0
+#define REQUEST_BAT 1
+#define REQUEST_GPS 2
+#define REQUEST_MAG 3
+#define REPLY_HEARTBEAT 4
+#define RECEIVE_ERROR 200
+
+/*Assigns memory for the payload*/
+byte payload[8]; 
+
+/*System variables*/
+byte state = 2;
+byte buoyCode = 0;
 
 void setup() {  
   /*Test GPS*/
@@ -48,35 +67,9 @@ void setup() {
 
 void loop() 
 {
-  /*Handle radio*/
-  int msg[2];
-  msg[1] = 5;
-  msg[0] = 0;
-  
-  //Check if data has been sent on listening port
-  if(radio.available())
-  {
-    Serial.println("I received a heartbeat");
-    // Read the data payload until we've received everything
-    bool done = false;
-    while (!done)
-    {
-        
-       //Fetch the data payload
-        done = radio.read(msg, sizeof(msg) );
-        
-    }
-    
-    radio.stopListening();
-     
-    delay(20); 
-    bool sendStatus = radio.write(&msg, sizeof(msg));
-   
-    //Switch back to listening mode  
-    radio.startListening();
-    
-    
-  }
+  /*Update the mesh network*/
+  network.update();
+  checkIfPacketsAreAvailable();  
   
   /*Read sensors*/
   
@@ -89,9 +82,38 @@ void loop()
   //Serial.println(buffer);
   
 
-  
-  delay(250);
   //readGPSRaw();
+}
+
+void checkIfPacketsAreAvailable()
+{
+  /*Handle radio*/
+  if(network.available())
+  {
+    Serial.println("Received request");
+
+     //Fetch the data payload
+     RF24NetworkHeader header;
+     network.read(header,&payload,sizeof(payload)); 
+    
+    delay(20); 
+    if (payload[0] == REQUEST_HEARTBEAT)
+    {
+      
+      /*Build heartbeat payload*/
+      payload[0] = REPLY_HEARTBEAT;
+      payload[1] = buoyCode;
+      payload[2] = state;
+      
+      /*Send off msg*/
+      Serial.println("Sending heartbeat Packet");
+      RF24NetworkHeader header(/*to node*/ CONTROLLER_ADDRESS);
+      bool sendStatus = network.write(header,&payload,sizeof(payload));
+      
+    }   
+    
+    
+  }
 }
 
 void testMotors()
@@ -175,9 +197,10 @@ void readCompass()
 void initRF()
 {    
     radio.begin();
-    radio.setRetries(15,15);
-    radio.setPayloadSize(8);
-    radio.openWritingPipe(controlRXPipe);
+    //radio.setRetries(15,15);
+    network.begin(/*channel*/ 90, /*node address*/ BUOY_G1_ADDRESS);
+    //radio.setPayloadSize(9);
+    /*radio.openWritingPipe(controlRXPipe);
     radio.openReadingPipe(1,controlTXPipe);
-    radio.startListening();
+    radio.startListening();*/
 }

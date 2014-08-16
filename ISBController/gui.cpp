@@ -30,8 +30,12 @@ int contrast = 57;
 int courseWidth = 11;
 int courseLength = 25;
 int courseTurns = 6;
+extern int buoyStatus[10];
 
-
+void updateGUI()
+{
+   screenChanged = 1; 
+}
 
 /*Checks rotary encoder status and reacts to input accordingly*/
 void controlUpdate()
@@ -357,13 +361,10 @@ void screenUpdate()
   case MENU_BUOYS:
     /*Draw header*/
     drawHeader("BUOYS");
-    
-    
-    /*TODO: Show all the available buoys on the network*/
-    display.setTextColor(BLACK);
-    display.setTextSize(1);
-    display.setCursor(1,18);
-    display.println("Under\nConstruction");
+    /*Draw menu items*/
+    noOfMenuItems = 0;    
+    if(buoyStatus[0] == 1)
+      drawMenuItem("BUOY ONE",0);
     
     /*Draw selected cursor*/
     drawCursor();
