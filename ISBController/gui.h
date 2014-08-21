@@ -28,6 +28,8 @@
 #define MENU_COURSE_WIDTH 7
 #define MENU_COURSE_LENGTH 8
 #define MENU_COURSE_TURNS 9
+/*Buoy state*/
+#define MENU_BUOY 10
 
 
 /*Define menu orders*/
@@ -51,6 +53,7 @@ void controlUpdate();
 void screenUpdate();
 void drawMenuSliderItem(char* string,char* unit,short index,int value,int minValue,int maxValue,short active);
 void drawCourse();
+void drawStatusItem(char* string,char* value,short index);
 void drawMenuItem(char* string,short index);
 void drawHeader(char* string);
 void drawCursor();
@@ -58,6 +61,7 @@ void splashScreen();
 void initScreen(int setMenuState,int setInnerMenuState);
 void timerIsr();
 void initEncoder();
+void drawBuoySelectStatusCourse(int selection);
 
 
 #endif

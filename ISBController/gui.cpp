@@ -30,7 +30,12 @@ int contrast = 57;
 int courseWidth = 11;
 int courseLength = 25;
 int courseTurns = 6;
-extern int buoyStatus[10];
+extern bool buoyStatus[COURSE_SIZE];
+
+extern int buoyCompass;
+extern byte buoyNoSat;
+extern long buoyLat;
+extern long buoyLon;
 
 void updateGUI()
 {
@@ -130,6 +135,36 @@ void controlUpdate()
      current menu status*/
     switch(menuState)
     {
+      
+      case MENU_BUOYS:
+        switch(innerMenuState)
+        {
+            case MENU_BACK:
+              menuState = MENU_MAIN;
+              innerMenuState = MENU_BACK;
+              noOfMenuItems = 0;
+              break; 
+            
+           default:
+             menuState = MENU_BUOY;
+             innerMenuState = MENU_BACK;
+             noOfMenuItems = 0;
+             break; 
+        }
+        break;
+        
+      case MENU_BUOY:      
+        switch(innerMenuState)
+        {
+          case MENU_BACK:
+            menuState = MENU_BUOYS;
+            innerMenuState = MENU_BACK;
+            noOfMenuItems = 0;
+            break; 
+            
+        }
+      break;
+      
     case MENU_STATUS:
       /*Change into main menu*/
       menuState = MENU_MAIN;
@@ -137,6 +172,8 @@ void controlUpdate()
       innerMenuState = MENU_BACK; 
       noOfMenuItems = 0;
       break;
+      
+
 
     case MENU_MAIN:
       /*Check which menu option is selected*/
@@ -234,17 +271,11 @@ void controlUpdate()
         noOfMenuItems = 0;
         break;
       
-      case MENU_BUOYS:
-      {
-        switch(innerMenuState)
-        {
-          case MENU_BACK:
-            menuState = MENU_MAIN;
-            innerMenuState = MENU_BACK;
-            noOfMenuItems = 0;
-            break; 
-        }
-      }
+
+      
+
+      
+
       
       case MENU_SETTINGS:
         /*Check which menu option is selected*/
@@ -362,12 +393,27 @@ void screenUpdate()
     /*Draw header*/
     drawHeader("BUOYS");
     /*Draw menu items*/
-    noOfMenuItems = 0;    
-    if(buoyStatus[0] == 1)
-      drawMenuItem("BUOY ONE",0);
+    noOfMenuItems = 22;
+    drawBuoySelectStatusCourse(innerMenuState);
     
     /*Draw selected cursor*/
-    drawCursor();
+    if(innerMenuState == MENU_BACK)
+      drawCursor();
+    break;
+    
+  case MENU_BUOY:
+    /*Draw header*/
+    drawHeader("DATA");
+    /*Draw menu items*/
+    noOfMenuItems = 0;
+    char buf[4];
+    drawStatusItem("Heading: ",itoa(buoyCompass,buf,10),0);
+    drawStatusItem("No of Sats: ",itoa(buoyNoSat,buf,10),1);
+    drawStatusItem("Lat: ",itoa(buoyLat,buf,10),2);
+    drawStatusItem("Lon: ",itoa(buoyLon,buf,10),3);
+    
+    /*Draw selected cursor*/
+     drawCursor();
     break;
   
   case MENU_SETTINGS:
@@ -446,6 +492,24 @@ void drawMenuItem(char* string,short index)
   display.setTextSize(1);
   display.setCursor(CURSOR_WIDTH+1,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER);
   display.println(string);
+
+  /*Increase the number of menu items available*/
+  noOfMenuItems += 1;
+}
+
+/*Draws a status item under the header location with a 
+ given index. This allows menu items to be easily swapped
+ in the configuration. Menu items should have names 6 
+ characters or less, its assumed that the 0 state is the
+ root state*/
+void drawStatusItem(char* string,char* value,short index)
+{
+  display.setTextColor(BLACK);
+  display.setTextSize(1);
+  display.setCursor(CURSOR_WIDTH+1,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER);
+  display.println(string);
+  display.setCursor(display.width()-strlen(value)*CHAR_WIDTH,index*(LINE_HEIGHT + LINE_SPACER)+HEADER_HEIGHT+ LINE_SPACER);
+  display.println(value);
 
   /*Increase the number of menu items available*/
   noOfMenuItems += 1;
@@ -575,6 +639,79 @@ void drawCourse()
       display.fillCircle(startX + turnSpacing*i,centreLine-outsideBuoy-4,1,BLACK);
     else
       display.fillCircle(startX + turnSpacing*i,centreLine+outsideBuoy+4,1,BLACK);
+  }
+
+}
+
+/*Draws the buoys on screen, showing the current selection as well as the availabillity of the buoy*/
+void drawBuoySelectStatusCourse(int selection)
+{
+  
+  int turns = courseTurns;
+  int centreLine = display.height() - COURSE_DISPLAY_SIZE/2 -1-5;
+  int middleCourse = 42;
+  int turnSpacing = ((COURSE_MAX_LENGTH-COURSE_MIN_LENGTH)*((display.width()-2 - 2*(courseTurns+2))/(courseTurns+2)))/(COURSE_MAX_LENGTH - COURSE_MIN_LENGTH)+2;
+  int outsideBuoy = 11;
+  int startX = middleCourse-(turnSpacing*(courseTurns+2))/2+turnSpacing/2;
+
+  byte buoyStatusCount = 0;
+  //Draw Gates
+  int i = 0;
+  for (i = 0;i<courseTurns +2;i++)
+  {
+    if(buoyStatus[buoyStatusCount])
+      display.fillCircle(startX + turnSpacing*i,centreLine-4,2,BLACK);
+    else
+      display.drawCircle(startX + turnSpacing*i,centreLine-4,2,BLACK);
+    buoyStatusCount += 1;
+    
+    if(buoyStatus[buoyStatusCount])
+      display.fillCircle(startX+ turnSpacing*i,centreLine+4,2,BLACK);
+    else
+      display.drawCircle(startX + turnSpacing*i,centreLine+4,2,BLACK);
+    buoyStatusCount += 1;
+  }
+  
+  
+  //Draw Turn Buoys
+  for (i = 1;i<courseTurns +1;i++)
+  {
+    if(i%2 == 0)
+    {
+      if(buoyStatus[buoyStatusCount])
+        display.fillCircle(startX + turnSpacing*i,centreLine-outsideBuoy-4,2,BLACK);
+      else
+        display.drawCircle(startX + turnSpacing*i,centreLine-outsideBuoy-4,2,BLACK);
+    }
+    else
+    {
+      if(buoyStatus[buoyStatusCount])
+        display.fillCircle(startX + turnSpacing*i,centreLine+outsideBuoy+4,2,BLACK);
+      else
+        display.drawCircle(startX + turnSpacing*i,centreLine+outsideBuoy+4,2,BLACK);
+    }
+  }
+  
+  //Draw cursor
+  if(selection >= 0 && selection < (courseTurns+2)*2)
+  {
+    byte remainder = selection%2;
+    if(remainder == 0)
+      display.drawCircle(startX + turnSpacing*((selection-remainder)/2),centreLine-4,4,BLACK);
+    else      
+      display.drawCircle(startX + turnSpacing*((selection-remainder)/2),centreLine+4,4,BLACK);
+  }
+  if(selection > (courseTurns+1)*2+1)
+  {
+    byte remainder = selection%2;
+    if(selection%2 == 0)
+    {
+        display.drawCircle(startX + turnSpacing*(1+selection-(courseTurns+2)*2),centreLine+outsideBuoy+4,4,BLACK);
+    }
+    else    {
+        
+        display.drawCircle(startX + turnSpacing*(1+selection-(courseTurns+2)*2),centreLine-outsideBuoy-4,4,BLACK);
+    }
   }
 
 }

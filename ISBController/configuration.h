@@ -13,4 +13,6 @@
 #define CONTRAST_MAX 80
 #define CONTRAST_MIN 30
 
+#define COURSE_SIZE 22
+
 #endif

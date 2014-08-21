@@ -36,6 +36,9 @@ Adafruit_PCD8544 display = Adafruit_PCD8544(LCD_CLK,LCD_DIN,LCD_DC, LCD_CS, LCD_
 /*Encoder initialisation using defined pins and steps-per-notch*/
 ClickEncoder *encoder = new ClickEncoder(ENCODER_DT, ENCODER_CLK, ENCODER_SWITCH,ENCODER_STEPS_PER_NOTCH);
 
+/*Radio General Settings*/
+#define PAYLOAD_SIZE 8
+#define MAX_QUEUE_SIZE 10
 
 /*Define radio addresses*/
 #define CONTROLLER_ADDRESS 0
@@ -46,24 +49,39 @@ ClickEncoder *encoder = new ClickEncoder(ENCODER_DT, ENCODER_CLK, ENCODER_SWITCH
 #define REQUEST_BAT 1
 #define REQUEST_GPS 2
 #define REQUEST_MAG 3
-#define REPLY_HEARTBEAT 4
+#define REQUEST_GPS_FIX 4
+#define REQUEST_GPS_LAT 5
+#define REQUEST_GPS_LON 6
+#define REPLY_HEARTBEAT 7
+#define REPLY_MAG 8
+#define REPLY_GPS_FIX 9
+#define REPLY_GPS_LAT 10
+#define REPLY_GPS_LON 11
 #define RECEIVE_ERROR 200
-
-#define COURSE_SIZE 10
-
 
 /*RF module variables*/
 RF24 radio(RF_CE, RF_CSN);
 // Network uses that radio
 RF24Network network(radio);
 
-byte payload[8];
+//Handle event when queue is full
+//byte payload[PAYLOAD_SIZE];
+byte sendQueue[MAX_QUEUE_SIZE][PAYLOAD_SIZE];
+byte queueSendPointer = 0;
+byte queuePopulatePointer = 0;
 
-short heartbeatReqCount = 0;
+int heartbeatReqCount = 0;
 
+bool buoyStatus [COURSE_SIZE]; // Status of buoy, gets updated at constant intervals. -1 indicates no communication.
+int buoyCompass = 0;
+byte buoyNoSat = 0;
+long buoyLat = 0;
+long buoyLon = 0;
 
-
-int buoyStatus [COURSE_SIZE]; // Status of buoy, gets updated at constant intervals. -1 indicates no communication.
+bool waitingOnReply = false;
+byte hbTurnCount = 200;
+byte magTurnCount = 200;
+int timeout = 255;
 
 void setup()   {
   Serial.begin(9600);
@@ -71,7 +89,7 @@ void setup()   {
   /*Initialise rotary encoder used to control the interface
    and screen used to display the interface*/
   initEncoder();
-  initScreen(MENU_STATUS,MENU_BACK); 
+  initScreen(MENU_BUOYS,MENU_BACK); 
   initRF();
 
   /*Show intro*/
@@ -81,7 +99,7 @@ void setup()   {
   /*Initialise Buoy Statuses*/
   int i = 0;
   for(i = 0;i < COURSE_SIZE;i++)
-    buoyStatus[i] = 0;
+    buoyStatus[i] = false;
  
 }
 
@@ -91,12 +109,70 @@ void loop() {
   network.update();
   checkIfPacketsAreAvailable();
   
-  /*Check the status of buoys*/
-  if(heartbeatReqCount == 0)
+  if( queueSendPointer != queuePopulatePointer)
   {
-    checkBuoy(BUOY_G1_ADDRESS);  
+    if(!waitingOnReply )
+    {
+      
+       /*Do transmission*/
+       Serial.print(" Node ");
+       Serial.print(sendQueue[queueSendPointer][1]);
+       Serial.print(" Send Pointer ");
+       Serial.print(queueSendPointer);
+       Serial.print(" Pop Pointer ");
+       Serial.println(queuePopulatePointer);
+       
+       RF24NetworkHeader header(/*to node*/ sendQueue[queueSendPointer][1]);        
+       bool sendStatus = network.write(header,&sendQueue[queueSendPointer],sizeof(sendQueue[queueSendPointer]));
+       queueSendPointer++;
+       if(queueSendPointer == MAX_QUEUE_SIZE)
+         queueSendPointer = 0;
+        /*if(magTurnCount <= hbTurnCount)
+        {
+          getBuoyCompass(BUOY_G1_ADDRESS);
+          magTurnCount = 200;
+          
+        }
+        else if(hbTurnCount < magTurnCount)
+        {
+          checkBuoy(BUOY_G1_ADDRESS);
+          requestNoOfSats(BUOY_G1_ADDRESS);
+          hbTurnCount = 200;
+        } 
+        
+        if(magTurnCount > 0) magTurnCount -= 1;
+        if(hbTurnCount > 0) hbTurnCount -= 1;*/
+        
+        waitingOnReply = true;
+        timeout = 5000;
+    }
+    else if(timeout < 0)
+    {
+        waitingOnReply = false;
+        timeout = 255;
+        Serial.println("Timeout");
+    }
+    else
+      timeout -=1;
+    
+  }
+      
+  /*Check the status of buoys*/
+  if(heartbeatReqCount == 5000)
+  {     
+    checkBuoy(BUOY_G1_ADDRESS,sendQueue[queuePopulatePointer++]);
+    if(queuePopulatePointer == MAX_QUEUE_SIZE)
+     queuePopulatePointer = 0;
+    getBuoyCompass(BUOY_G1_ADDRESS,sendQueue[queuePopulatePointer++]);
+    if(queuePopulatePointer == MAX_QUEUE_SIZE)
+     queuePopulatePointer = 0;
+    requestNoOfSats(BUOY_G1_ADDRESS,sendQueue[queuePopulatePointer++]);
+    if(queuePopulatePointer == MAX_QUEUE_SIZE)
+     queuePopulatePointer = 0;
+    
     updateGUI();
-
+    //if(buoyStatus[0]) Serial.println("Active"); else Serial.println("Inactive");
+    heartbeatReqCount = 0;
   }
 
   /*Start with main routine*/
@@ -112,54 +188,85 @@ void loop() {
 
 
   heartbeatReqCount += 1;
+  
+  
 }
 
 void checkIfPacketsAreAvailable()
 {
-  payload[0] = 200;
-  if (network.available() )
+  byte payloadRec[PAYLOAD_SIZE];
+  while(network.available() )  
   {  
-    // Read the data payload until we've received everything
-    bool done = false;
-    
+     
      //Fetch the data payload
      RF24NetworkHeader header;
-     network.read(header,&payload,sizeof(payload));
-     //done = radio.read(&payload, sizeof(payload) );      
-       
+     network.read(header,&payloadRec,sizeof(payloadRec));
     
     //Check the type of message that was received
-     if(payload[0] == REPLY_HEARTBEAT)
+     if(payloadRec[0] == REPLY_HEARTBEAT)
      {
+        Serial.println("R HB");
         //Update alive buoys
-        buoyStatus[payload[1]] = 1;
-     }     
+        buoyStatus[payloadRec[1]] = true;
+     }    
+     else if(payloadRec[0] == REPLY_MAG)
+     {     
+        Serial.println("R M");
+        memcpy(&buoyCompass,&payloadRec[3],sizeof(int));        
+     }    
+     else if(payloadRec[0] == REPLY_GPS_FIX)
+     {     
+        Serial.println("R GF");
+        memcpy(&buoyNoSat,&payloadRec[3],sizeof(byte));     
 
+     }    
+     else
+     {
+        Serial.print("Unknown Packet: "); 
+        Serial.println(payloadRec[0]);
+     }
+     waitingOnReply = false;
   }
   
 }
 
 /*Checks if a buoy is alive. If the buoy is active, it will reply its battery voltage*/
-void checkBuoy(int buoyAddress)
+void checkBuoy(int buoyAddress, byte* payload)
 {
    /*Build Payload*/
+   Serial.println("S HB");
    payload[0] = REQUEST_HEARTBEAT;
-   
-   /*Do transmission*/
-   RF24NetworkHeader header(/*to node*/ buoyAddress);
-   bool sendStatus = network.write(header,&payload,sizeof(payload));
-
-   //radio.stopListening();
-   
-   //bool sendStatus = radio.write(&payload, sizeof(payload));
-   
-   /*Check if msg could be sent succesfully, if not buoy is not available*/
-   if (!sendStatus)
-   {
-     buoyStatus[buoyAddress-1] = 0;
-
-   }
+   payload[1] = buoyAddress;
      
+   /*Check if msg could be sent succesfully, if not buoy is not available*/
+   //if (!sendStatus)
+   //{
+     //Serial.println("Failed");
+     //buoyStatus[buoyAddress-1] = false;
+
+   //}    
+   
+}
+
+/*Checks if a buoy is alive. If the buoy is active, it will reply its battery voltage*/
+void getBuoyCompass(int buoyAddress, byte* payload)
+{
+   /*Build Payload*/
+   Serial.println("S M");
+   payload[0] = REQUEST_MAG;
+   payload[1] = buoyAddress;
+   
+}
+
+void requestNoOfSats(int buoyAddress, byte* payload)
+{
+      /*Build payload*/
+      Serial.println("S GF");
+      payload[0] = REQUEST_GPS_FIX;
+      payload[1] = buoyAddress;
+      /*Send off msg*/
+      //RF24NetworkHeader header(/*to node*/ buoyAddress);
+      //bool sendStatus = network.write(header,&payload,sizeof(payload));   
 }
 
 
