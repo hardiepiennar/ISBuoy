@@ -15,4 +15,7 @@
 #define RF_CE 9
 #define RF_CSN 10
 
+/*Battery monitoring pin*/
+#define BAT 0
+
 #endif

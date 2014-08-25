@@ -32,8 +32,9 @@ int courseLength = 25;
 int courseTurns = 6;
 extern bool buoyStatus[COURSE_SIZE];
 
+/*Global buoy variables*/
 extern int buoyCompass;
-extern byte buoyNoSat;
+extern int buoyBat;
 extern long buoyLat;
 extern long buoyLon;
 
@@ -406,11 +407,12 @@ void screenUpdate()
     drawHeader("DATA");
     /*Draw menu items*/
     noOfMenuItems = 0;
-    char buf[4];
-    drawStatusItem("Heading: ",itoa(buoyCompass,buf,10),0);
-    drawStatusItem("No of Sats: ",itoa(buoyNoSat,buf,10),1);
-    drawStatusItem("Lat: ",itoa(buoyLat,buf,10),2);
-    drawStatusItem("Lon: ",itoa(buoyLon,buf,10),3);
+    char shortBuf[3];
+    drawStatusItem("Heading: ",itoa(buoyCompass,shortBuf,10),0);
+    drawStatusItem("Battery: ",itoa(buoyBat,shortBuf,10),1);
+    char longBuf[10];    
+    drawStatusItem("Lat: ",ltoa(buoyLat,longBuf,10),2);
+    drawStatusItem("Lon: ",ltoa(buoyLon,longBuf,10),3);
     
     /*Draw selected cursor*/
      drawCursor();
